@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <jpeglib.h>
 
 struct entry_t {
     uint32_t offset;
@@ -109,6 +110,50 @@ struct face_t {
     uint8_t light[2];
     int32_t lightmap;
 };
+
+static int32_t write_jpeg(uint8_t *buffer, int32_t width, int32_t height, char *file_name)
+{
+    struct jpeg_compress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+    FILE *fp;
+
+    fp = fopen(file_name, "wb");
+    if (!fp)
+    {
+        printf("could not open file: %s\n", file_name);
+        return 1;
+    }
+
+    cinfo.err = jpeg_std_error(&jerr);
+
+    jpeg_create_compress(&cinfo);
+    jpeg_stdio_dest(&cinfo, fp);
+
+    cinfo.image_width = width;
+    cinfo.image_height = height;
+    cinfo.input_components = 1;
+    cinfo.in_color_space = JCS_GRAYSCALE;
+
+    jpeg_set_defaults(&cinfo);
+    jpeg_set_quality(&cinfo, 60, TRUE);
+
+    jpeg_start_compress(&cinfo, TRUE);
+
+    while (cinfo.next_scanline < height)
+    {
+        JSAMPROW row_ptr[1];
+
+        row_ptr[0] = &buffer[cinfo.next_scanline * width];
+        jpeg_write_scanlines(&cinfo, row_ptr, 1);
+    }
+
+    jpeg_finish_compress(&cinfo);
+    jpeg_destroy_compress(&cinfo);
+
+    fclose(fp);
+
+    return 0;
+}
 
 int main(int argc, char *argv[])
 {
